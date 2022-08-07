@@ -1,0 +1,12 @@
+== Example
+
+[source,lisp]
+---
+(pci-drivers
+	(1af4 ; Red Hat
+		(1000 "drivers/pci/virtio/net")
+		(1001 "drivers/pci/virtio/blk")
+		(1040 "drivers/pci/virtio/gpu"))
+	(8086 ; Intel
+		(1616 "drivers/pci/intel/hd_graphics")))
+---

@@ -7,6 +7,15 @@ pub enum Token<'a> {
     Str(&'a [u8]),
 }
 
+impl<'a> Token<'a> {
+    pub fn into_str(self) -> Option<&'a [u8]> {
+        match self {
+            Self::Str(s) => Some(s),
+            _ => None,
+        }
+    }
+}
+
 pub struct Iter<'a> {
     data: &'a [u8],
     index: usize,
@@ -29,34 +38,38 @@ impl<'a> Iterator for Iter<'a> {
                 c if c.is_ascii_whitespace() => {}
                 b'(' => return Some(Ok(Token::Begin)),
                 b')' => return Some(Ok(Token::End)),
-                b'"' => loop {
+                lim @ b'"' | lim @ b'\'' => loop {
                     let start = self.index;
                     while let Some(&c) = self.data.get(self.index) {
                         self.index += 1;
                         match c {
-                            b'"' => return Some(Ok(Token::Str(&self.data[start..self.index - 1]))),
                             b'\\' => self.index += 1,
+                            c if c == *lim => {
+                                return Some(Ok(Token::Str(&self.data[start..self.index - 1])))
+                            }
                             _ => {}
                         }
                     }
                     return Some(Err(Error::UnterminatedQuote));
                 },
-                b';' => while self.data.get(self.index).map_or(false, |c| *c != b'\n') {
-                    self.index += 1;
+                b';' => {
+                    while self.data.get(self.index).map_or(false, |c| *c != b'\n') {
+                        self.index += 1;
+                    }
                 }
                 _ => loop {
                     let start = self.index - 1;
                     while let Some(&c) = self.data.get(self.index) {
                         self.index += 1;
                         match c {
-                            c if c.is_ascii_whitespace() => {
-                                return Some(Ok(Token::Str(&self.data[start..self.index - 1])))
+                            c if c == b'(' || c == b')' || c.is_ascii_whitespace() => {
+                                self.index -= 1;
+                                break;
                             }
-                            c if b' ' < c && c <= b'~' => {}
-                            _ => return Some(Err(Error::InvalidSymbolChar)),
+                            _ => {}
                         }
                     }
-                    return Some(Ok(Token::Str(&self.data[start..])));
+                    return Some(Ok(Token::Str(&self.data[start..self.index])));
                 },
             }
         }
@@ -102,7 +115,10 @@ mod test {
         assert_eq!(it.next(), Some(Ok(Token::Str(b"8086"))));
         assert_eq!(it.next(), Some(Ok(Token::Begin)));
         assert_eq!(it.next(), Some(Ok(Token::Str(b"1616"))));
-        assert_eq!(it.next(), Some(Ok(Token::Str(b"drivers/pci/intel/hd graphics"))));
+        assert_eq!(
+            it.next(),
+            Some(Ok(Token::Str(b"drivers/pci/intel/hd graphics")))
+        );
         assert_eq!(it.next(), Some(Ok(Token::End)));
         assert_eq!(it.next(), Some(Ok(Token::End)));
         assert_eq!(it.next(), Some(Ok(Token::End)));

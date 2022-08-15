@@ -1,14 +1,16 @@
 #![cfg_attr(not(test), no_std)]
 
+use core::str;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Token<'a> {
 	Begin,
 	End,
-	Str(&'a [u8]),
+	Str(&'a str),
 }
 
 impl<'a> Token<'a> {
-	pub fn into_str(self) -> Option<&'a [u8]> {
+	pub fn into_str(self) -> Option<&'a str> {
 		match self {
 			Self::Str(s) => Some(s),
 			_ => None,
@@ -25,12 +27,18 @@ pub struct Iter<'a> {
 pub enum Error {
 	UnterminatedQuote,
 	InvalidSymbolChar,
+	InvalidUtf8,
 }
 
 impl<'a> Iterator for Iter<'a> {
 	type Item = Result<Token<'a>, Error>;
 
 	fn next(&mut self) -> Option<Self::Item> {
+		let ret_str = |s| {
+			str::from_utf8(s)
+				.map_err(|_| Error::InvalidUtf8)
+				.map(|s| Token::Str(s))
+		};
 		loop {
 			let c = self.data.get(self.index)?;
 			self.index += 1;
@@ -45,7 +53,7 @@ impl<'a> Iterator for Iter<'a> {
 						match c {
 							b'\\' => self.index += 1,
 							c if c == *lim => {
-								return Some(Ok(Token::Str(&self.data[start..self.index - 1])))
+								return Some(ret_str(&self.data[start..self.index - 1]));
 							}
 							_ => {}
 						}
@@ -69,7 +77,7 @@ impl<'a> Iterator for Iter<'a> {
 							_ => {}
 						}
 					}
-					return Some(Ok(Token::Str(&self.data[start..self.index])));
+					return Some(ret_str(&self.data[start..self.index]));
 				},
 			}
 		}
@@ -95,29 +103,29 @@ mod test {
 		(1616 "drivers/pci/intel/hd graphics"))) ; intentional space"#;
 		let mut it = parse(t);
 		assert_eq!(it.next(), Some(Ok(Token::Begin)));
-		assert_eq!(it.next(), Some(Ok(Token::Str(b"pci-drivers"))));
+		assert_eq!(it.next(), Some(Ok(Token::Str("pci-drivers"))));
 		assert_eq!(it.next(), Some(Ok(Token::Begin)));
-		assert_eq!(it.next(), Some(Ok(Token::Str(b"1af4"))));
+		assert_eq!(it.next(), Some(Ok(Token::Str("1af4"))));
 		assert_eq!(it.next(), Some(Ok(Token::Begin)));
-		assert_eq!(it.next(), Some(Ok(Token::Str(b"1000"))));
-		assert_eq!(it.next(), Some(Ok(Token::Str(b"drivers/pci/virtio/net"))));
+		assert_eq!(it.next(), Some(Ok(Token::Str("1000"))));
+		assert_eq!(it.next(), Some(Ok(Token::Str("drivers/pci/virtio/net"))));
 		assert_eq!(it.next(), Some(Ok(Token::End)));
 		assert_eq!(it.next(), Some(Ok(Token::Begin)));
-		assert_eq!(it.next(), Some(Ok(Token::Str(b"1001"))));
-		assert_eq!(it.next(), Some(Ok(Token::Str(b"drivers/pci/virtio/blk"))));
+		assert_eq!(it.next(), Some(Ok(Token::Str("1001"))));
+		assert_eq!(it.next(), Some(Ok(Token::Str("drivers/pci/virtio/blk"))));
 		assert_eq!(it.next(), Some(Ok(Token::End)));
 		assert_eq!(it.next(), Some(Ok(Token::Begin)));
-		assert_eq!(it.next(), Some(Ok(Token::Str(b"1050"))));
-		assert_eq!(it.next(), Some(Ok(Token::Str(b"drivers/pci/virtio/gpu"))));
+		assert_eq!(it.next(), Some(Ok(Token::Str("1050"))));
+		assert_eq!(it.next(), Some(Ok(Token::Str("drivers/pci/virtio/gpu"))));
 		assert_eq!(it.next(), Some(Ok(Token::End)));
 		assert_eq!(it.next(), Some(Ok(Token::End)));
 		assert_eq!(it.next(), Some(Ok(Token::Begin)));
-		assert_eq!(it.next(), Some(Ok(Token::Str(b"8086"))));
+		assert_eq!(it.next(), Some(Ok(Token::Str("8086"))));
 		assert_eq!(it.next(), Some(Ok(Token::Begin)));
-		assert_eq!(it.next(), Some(Ok(Token::Str(b"1616"))));
+		assert_eq!(it.next(), Some(Ok(Token::Str("1616"))));
 		assert_eq!(
 			it.next(),
-			Some(Ok(Token::Str(b"drivers/pci/intel/hd graphics")))
+			Some(Ok(Token::Str("drivers/pci/intel/hd graphics")))
 		);
 		assert_eq!(it.next(), Some(Ok(Token::End)));
 		assert_eq!(it.next(), Some(Ok(Token::End)));

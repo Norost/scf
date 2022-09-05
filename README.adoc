@@ -1,7 +1,16 @@
+= S configuration format
+
+image:https://docs.rs/scf/badge.svg[https://docs.rs/scf]
+image:https://img.shields.io/crates/v/scf.svg[https://crates.io/crates/scf]
+image:https://img.shields.io/crates/d/scf.svg[https://crates.io/crates/scf]
+
+S is a simple configuration format based on S-Expressions.
+It is designed to be easy to edit, nest and parse.
+
 == Example
 
 [source,lisp]
----
+----
 (pci-drivers
 	(1af4 ; Red Hat
 		(1000 "drivers/pci/virtio/net")
@@ -9,4 +18,4 @@
 		(1040 "drivers/pci/virtio/gpu"))
 	(8086 ; Intel
 		(1616 "drivers/pci/intel/hd_graphics")))
----
+----
